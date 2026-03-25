@@ -1,4 +1,7 @@
-# SISOP-1-2026-IT-07
+# SISOP-1-2026-IT-079
+
+Nama : Raffa Al Azmi
+NRP : 5027251079
 Repository ini berisi penyelesaian Modul 1 Praktikum Sistem Operasi.
 
 ## Soal 1
@@ -67,7 +70,7 @@ SISOP-1-2026-IT-079
 │
 ├── README.md
 │
-└── soal1.c
+└── soal_1
     ├── KANJ.sh
     └── passenger.csv
 
@@ -78,8 +81,8 @@ SISOP-1-2026-IT-079
 Pada soal ini dibuat sistem berbasis shell script untuk mengolah data koordinat dari file JSON guna menentukan lokasi pusaka berdasarkan titik-titik penting.
 
 📂 Struktur Folder
-soal_2/
-└── ekspedisi/
+soal_2
+└── ekspedisi
     ├── gsxtrack.json
     ├── parserkoordinat.sh
     ├── nemupusaka.sh
