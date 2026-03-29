@@ -15,7 +15,16 @@ awk -f KANJ.sh passenger.csv [a/b/c/d/e]
 setiap opsi memiliki fungsi masing - masing
 
 Penjelasan Prgoram
+1. mendownload file passenger terlebih dahulu
+```c
+https://docs.google.com/spreadsheets/d/1NHmyS6wRO7To7ta-NLOOLHkPS6valvNaX7tawsv1zfE/export?format=csv&gid=0
+```
+setelah itu jadikan file tersebut sebagai file dalam folder
+supaya dapat berjalan codenya
 
+2. membuat file KANJ.sh
+   dengan code seperti dibawah
+   
 ```c
 NR > 1 { count++ }
 END { print "Jumlah seluruh penumpang KANJ adalah " count " orang" }
