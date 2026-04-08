@@ -70,10 +70,10 @@ int main() {
 }
  ```
 penjelasan singkat 
-*'fork()' → bikin child process (Ipin)
-*'execlp()'→ jalankan command Linux
-*'waitpid()' → parent (Upin) nunggu child selesai
-*'WEXITSTATUS(status)' → cek berhasil
+- fork() → bikin child process (Ipin)
+- execlp() → jalankan command Linux
+- waitpid() → parent (Upin) nunggu child selesai
+- WEXITSTATUS(status) → cek berhasil
 
 Output 
 jIka berhasil
@@ -93,6 +93,218 @@ gcc kasir_muthu.c -o kasir
 nanti akan muncul folder brankas_kedai, file daftar_penunggak.txt, file rahasia_muthu.zip
 
 Setelah setiap child process selesai, program menggunakan waitpid() dan WEXITSTATUS untuk memastikan eksekusi berhasil. Jika gagal, program langsung dihentikan dengan exit(). Jika semua proses berhasil, program menampilkan pesan sukses.”
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+1. Menjalankan Program
+ ```c
+gcc kasir_muthu.c -o kasir
+./kasir
+ ```
+Output:
+ ```c
+[INFO] Fuhh, selamat! Buku hutang dan daftar penagihan berhasil diamankan.
+ ```
+ 2. Struktur Folder Setelah Eksekusi
+ ```c
+ls
+ ```
+Output:
+ ```c
+brankas_kedai  buku_hutang.csv  kasir_muthu.c  rahasia_muthu.zip
+ ```
+ 3. Isi Folder Brankas
+```c
+ls brankas_kedai
+ ```
+Output:
+```c
+buku_hutang.csv  daftar_penunggak.txt
+ ```
+ 4. Hasil Filter Data (Belum Lunas)
+```c
+cat brankas_kedai/daftar_penunggak.txt
+ ```
+Output:
+```c
+Mail,Ayam Goreng 2 Paha,10.50,Belum Lunas
+Fizi,Es ABC Spesial,3.50,Belum Lunas
+Ahtong,Kopi O Tarik,2.00,Belum Lunas
+Upin,Nasi Lemak Telur Mata,4.00,Belum Lunas
+Ipin,Ayam Goreng 1 Dada,5.00,Belum Lunas
+Mei Mei,Susu Kedelai,2.50,Belum Lunas
+Susanti,Mie Goreng Mamak,5.50,Belum Lunas
+Ijat,Es Limau,1.50,Belum Lunas
+Ehsan,Nasi Lemak Ayam Goreng,9.50,Belum Lunas
+ ```
+ 5. File ZIP yang Dihasilkan
+```c
+ls rahasia_muthu.zip
+ ```
+Output:
+```c
+rahasia_muthu.zip
+ ```
+ 6. Isi File CSV Awal
+```c
+cat buku_hutang.csv
+ ```
+Output:
+```c
+Nama Pelanggan,Pesanan,Total (RM),Status
+Mail,Ayam Goreng 2 Paha,10.50,Belum Lunas
+Ehsan,Kue Inti 5 Biji,5.00,Lunas
+ ```
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 SOAL 2
+Program ini merupakan implementasi daemon process dalam bahasa C yang berjalan di background untuk memonitor dan menjaga integritas file contract.txt.
+
+Daemon akan:
+- Menulis log secara berkala
+- Membuat file otomatis
+- Mendeteksi penghapusan dan perubahan file
+- Melakukan restore
+- Menangani proses termination
+
+Cara kerjanya
+Inisialisasi Daemon
+
+Program dijalankan sebagai daemon dengan:
+- fork() untuk membuat child process
+- setsid() untuk detach dari terminal
+
+ 2. Logging Berkala (Setiap 5 Detik)
+
+Daemon menulis ke file:
+```c
+work.log
+ ```
+Format:
+```c
+still working...
+[awake/drifting/numbness]
+ ```
+Status dipilih secara acak.
+
+🔹 3. Membuat File Contract (Saat Program Dimulai)
+
+File:
+```c
+contract.txt
+ ```
+Isi:
+```c
+A promise to keep going, even when unseen.
+created at: <timestamp>
+ ```
+4. Deteksi File Dihapus (Auto Restore)
+
+Jika:
+contract.txt dihapus maka daemon akan:
+
+Membuat ulang file dalam 1–2 detik
+Mengubah baris kedua menjadi:
+```c
+restored at: <timestamp>
+ ```
+🔹 5. Deteksi Perubahan File
+
+Jika isi file diubah Daemon akan menulis:
+```c
+contract violated.
+ke work.log
+ ```
+File akan otomatis dikembalikan (restore)
+🔹 6. Saat Daemon Dihentikan
+
+Jika daemon dihentikan menggunakan:
+```c
+kill <PID>
+ ```
+Maka akan menulis:
+```c
+We really weren't meant to be together
+ ```
+📁 Struktur File
+soal_2/
+├── contract_daemon.c
+├── daemon
+├── contract.txt
+└── work.log
+
+🚀 Cara Menjalankan
+Compile
+```c
+gcc contract_daemon.c -o daemon
+ ```
+Run (background)
+```c
+./daemon &
+ ```
+Stop daemon
+```c
+ps aux | grep daemon
+kill <PID>
+ ```
+📊 Hasil Eksekusi
+1. Logging Berjalan
+```c
+cat work.log
+ ```
+Output:
+```c
+still working...
+[awake]
+still working...
+[drifting]
+ ```
+2. File Contract Dibuat
+```c
+cat contract.txt
+ ```
+Output:
+```c
+A promise to keep going, even when unseen.
+created at: 2026-04-07 14:30:00
+ ```
+3. File Dihapus → Restore
+```c
+rm contract.txt
+cat contract.txt
+ ```
+Output:
+```c
+A promise to keep going, even when unseen.
+restored at: 2026-04-07 14:32:10
+ ```
+4. File Diubah → Violation
+```c
+nano contract.txt
+ ```
+Tambahkan teks:
+```c
+HACKED 😈
+ ```
+Cek log:
+```c
+cat work.log
+ ```
+Output:
+```c
+contract violated.
+ ```
+5. Daemon Dihentikan
+```c
+kill <PID>
+cat work.log
+ ```
+Output:
+```c
+We really weren't meant to be together
+ ```
+Konsep yang Digunakan
+Daemon Process (fork, setsid)
+File Monitoring
+Signal Handling (SIGTERM)
+File I/O (fopen, fgets, fwrite)
+Infinite Loop Process
+Random Number (rand())
