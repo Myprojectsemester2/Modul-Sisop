@@ -155,7 +155,7 @@ Ehsan,Kue Inti 5 Biji,5.00,Lunas
  ```
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-SOAL 2
+## SOAL 2
 Program ini merupakan implementasi daemon process dalam bahasa C yang berjalan di background untuk memonitor dan menjaga integritas file contract.txt.
 
 Daemon akan:
@@ -308,3 +308,134 @@ Signal Handling (SIGTERM)
 File I/O (fopen, fgets, fwrite)
 Infinite Loop Process
 Random Number (rand())
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+## SOAL 3 (ANGEL DAEMON)
+
+alur dalam pengerjaan :
+     1. Program dijalankan dengan `-daemon`
+     2. Membuat proses background (fork + setsid)
+     3. Mengganti nama proses menjadi `maya`
+     4. Loop:
+             - generate kalimat
+             -  encode
+             - simpan log
+     5. `-decrypt` untuk decode
+     6. `-kill` untuk menghentikan
+
+
+dalam Program `angel.c` merupakan kita meng implementasi demon yang nama maya lalu kita mengcomplie supaya keluar LoveLetter.txt,ethereal log
+dalam LoveLetter.txt berisi kata kata acak yang tidak bisa dibaca lalu saat di ./angel -decrpyt maka kalimat akan menujukan seacara acak dari kalimat ini 
+    "aku akan fokus pada diriku sendiri",
+    "aku mencintaimu dari sekarang hingga selamanya",
+    "aku akan menjauh darimu, hingga takdir mempertemukan kita di versi kita yang terbaik.",
+    "kalau aku dilahirkan kembali, aku tetap akan terus menyayangimu"
+untuk mengecek jalannya program kita menggunakan ethereal.log
+
+### Cara Menjalankan & Output
+ Compile terlebih dahulu
+
+```bash
+gcc angel.c -o angel
+./angel -daemon
+```
+### ✅ Output (tidak ada output langsung karena daemon)
+
+Program berjalan di background
+
+### 🔍 Cek proses:
+
+```bash
+ps aux | grep maya
+```
+
+### Output:
+
+```bash
+rappa     1021  0.0  0.0   2684  1152 ?   Ss   23:29   0:00 maya
+```
+
+##  2. Hasil File (Setelah Daemon Jalan) akan muncul beberapa file
+
+```bash
+ls
+```
+
+### ✅ Output:
+
+```bash
+LoveLetter.txt  angel  angel.c  ethereal.log
+```
+
+---
+
+###  Isi File saat belum dicompile dan dijalankan
+
+```bash
+cat LoveLetter.txt
+```
+
+###  Output:
+
+```bash
+YWt1IG1lbmNpbnRhaW11IGRhcmkgc2VrYXJhbmcgaGluZ2dhIHNlbGFtYW55YQ==
+```
+
+ Isi ini berubah setiap ±10 detik saat kita complie menggunakan
+Decrypt File
+
+```bash
+./angel -decrypt
+```
+
+### Output:
+
+```bash
+Decrypt sukses
+```
+
+### 🔍 Cek isi file:
+
+```bash
+cat LoveLetter.txt
+```
+
+### ✅ Output:
+
+```bash
+aku mencintaimu dari sekarang hingga selamanya
+```
+dan sertiap detik akan berubah secara random
+---
+
+##  4. Menghentikan Daemon
+
+```bash
+./angel -kill
+```
+
+### ✅ Output:
+
+```bash
+Daemon dimatikan
+```
+
+---
+
+## 📝 5. File Log
+
+```bash
+cat ethereal.log
+```
+
+###  Output:
+```bash
+[10:04:2026]-[23:40:01]_compose_RUNNING
+[10:04:2026]-[23:40:01]_compose_DONE
+[10:04:2026]-[23:40:01]_encode_RUNNING
+[10:04:2026]-[23:40:01]_encode_DONE
+```
+
+Log akan terus bertambah setiap 10 detik
+
+---
+
