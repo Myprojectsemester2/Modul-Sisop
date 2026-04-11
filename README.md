@@ -338,11 +338,11 @@ untuk mengecek jalannya program kita menggunakan ethereal.log
 gcc angel.c -o angel
 ./angel -daemon
 ```
-### ✅ Output (tidak ada output langsung karena daemon)
+###  Output (tidak ada output langsung karena daemon)
 
 Program berjalan di background
 
-### 🔍 Cek proses:
+###  Cek proses:
 
 ```bash
 ps aux | grep maya
@@ -360,7 +360,7 @@ rappa     1021  0.0  0.0   2684  1152 ?   Ss   23:29   0:00 maya
 ls
 ```
 
-### ✅ Output:
+###  Output:
 
 ```bash
 LoveLetter.txt  angel  angel.c  ethereal.log
@@ -393,13 +393,13 @@ Decrypt File
 Decrypt sukses
 ```
 
-### 🔍 Cek isi file:
+###  Cek isi file:
 
 ```bash
 cat LoveLetter.txt
 ```
 
-### ✅ Output:
+###  Output:
 
 ```bash
 aku mencintaimu dari sekarang hingga selamanya
@@ -413,7 +413,7 @@ dan sertiap detik akan berubah secara random
 ./angel -kill
 ```
 
-### ✅ Output:
+###  Output:
 
 ```bash
 Daemon dimatikan
@@ -421,7 +421,7 @@ Daemon dimatikan
 
 ---
 
-## 📝 5. File Log
+##  5. File Log
 
 ```bash
 cat ethereal.log
