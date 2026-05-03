@@ -212,7 +212,7 @@ Mengirim pesan ke client.
 5.10 Logging
 ```c
 fprintf(...)
-
+```
 Menyimpan aktivitas ke file.
 
 6. Kode Utama (wired.c)
@@ -278,3 +278,135 @@ mencatat aktivitas ke file log
 menangani berbagai kondisi error
 
 Dengan pendekatan ini, sistem menjadi stabil dan sesuai dengan kebutuhan soal.
+
+# SOAL 2 – SISTEM ARENA (CLIENT-SERVER GAME)
+mensimulasikan game implemen IPC dan thread 
+
+Struktur program:
+```c
+orion.c sebagai server
+eternal.c sebagai client
+arena.h sebagai definisi struktur data
+Makefile untuk kompilasi dan manajemen IPC
+
+Cara compile dan Menjalankan
+```c
+make
+```
+Menjalankan Server
+```c
+./orion
+./eternal
+```
+1. REGISTER DAN LOGIN SYSTEM
+Tujuan
+
+Membuat sistem autentikasi pengguna yang aman dan mencegah duplikasi data serta login ganda.
+
+Cara Kerja
+Register
+
+Pengguna memasukkan username dan password. Sistem akan:
+
+Mengecek apakah username sudah digunakan
+Jika belum, data disimpan ke shared memory
+Login
+
+Pengguna memasukkan username dan password. Sistem akan:
+
+Memverifikasi kecocokan data
+Mengecek apakah akun sedang digunakan oleh client lain
+Struktur Data
+```c
+typedef struct {
+    char username[50];
+    char password[50];
+    int gold;
+    int level;
+    int xp;
+    int weapon;
+    int online;
+} Player;
+```
+Kendala
+Duplikasi username
+Login bersamaan dari dua client
+
+Solusi
+Validasi username saat register
+Menggunakan flag online untuk mencegah login ganda
+Mutex untuk sinkronisasi akses data
+
+2. MATCHMAKING SYSTEM
+Tujuan
+
+Menghubungkan dua pemain untuk bertarung dalam satu arena.
+
+Cara Kerja
+Client mengirim request matchmaking ke server menggunakan message queue
+Server menyimpan player pertama sebagai waiting
+Ketika player kedua masuk, server memasangkan keduanya
+Server mengirim pesan ke kedua client bahwa match ditemukan
+Mekanisme
+```c
+Menggunakan message type MT_MATCH_REQ dan MT_MATCH_FOUND
+Server menyimpan sementara ID player yang menunggu
+Timeout
+```
+Jika tidak ditemukan lawan dalam waktu tertentu, sistem akan mengarahkan pemain untuk melawan bot.
+
+Kendala
+Player bisa masuk lebih dari satu matchmaking
+Sinkronisasi antar player tidak konsisten
+Solusi
+Menggunakan flag in_match
+Mengunci shared memory saat proses matchmaking
+
+3. BATTLE SYSTEM (REALTIME)
+Membuat sistem pertarungan antar pemain secara realtime tanpa blocking.
+
+Cara Kerja
+Input
+```c
+a untuk serangan biasa
+u untuk ultimate
+Perhitungan Damage
+Damage = 10 + (XP / 50) + Weapon
+
+Ultimate:
+
+Damage = Damage × 3
+Perhitungan HP
+HP = 100 + (XP / 10)
+Realtime System
+```
+Battle dijalankan menggunakan multithreading:
+
+Thread utama menangani input user
+Thread kedua menerima damage dari lawan
+Komunikasi
+
+Damage dikirim melalui message queue dari satu client ke client lain melalui server.
+
+
+4. ARMORY SYSTEM
+ fitur pembelian senjata untuk meningkatkan kekuatan pemain.
+
+Cara Kerja
+
+Player dapat membeli:
+Wood Sword dengan tambahan damage kecil
+Iron Sword dengan tambahan damage lebih besar
+Mekanisme
+Sistem mengecek jumlah gold sebelum pembelian
+Weapon akan diperbarui hanya jika lebih kuat dari sebelumnya
+Contoh
+```c
+if(me->weapon < 15) me->weapon = 15;
+Kendala
+Gold menjadi negatif
+Weapon tertimpa oleh nilai lebih kecil
+Solusi
+Validasi gold sebelum pembelian
+Bandingkan nilai weapon sebelum update
+```
