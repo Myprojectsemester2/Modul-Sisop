@@ -173,16 +173,16 @@ cat mnt/1.txt
 filesystem akan membuka file asli dari source directory.
 
 # Fungsi read
+```c
 static int x_read(...)
-
+```
 Fungsi ini digunakan untuk membaca isi file.
 
 Isi file dari:
-```c
 1.txt
 2.txt
 hingga 7.txt
-```
+
 ditampilkan melalui mount point tanpa mengubah isi aslinya.
 
 File Virtual tujuan.txt
@@ -257,7 +257,7 @@ Command:
 ls mnt
 ```
 Output:
-
+```c
 1.txt
 2.txt
 3.txt
@@ -266,7 +266,7 @@ Output:
 6.txt
 7.txt
 tujuan.txt
-
+```
 Hal ini menunjukkan filesystem berhasil melakukan mirror file serta menambahkan file virtual.
 
 2. Mengecek Isi File
@@ -312,3 +312,373 @@ Tidak terdapat:
 tujuan.txt
 ```
 Hal ini membuktikan bahwa file tersebut merupakan virtual file.
+
+# SOAL 2 — MINI DATABASE SERVICE
+Deskripsi Soal
+praktikan diminta membuat sebuah filesystem virtual menggunakan FUSE yang berfungsi sebagai translator antara direktori terenkripsi dengan mount point yang dapat diakses user secara normal.
+
+Project yang dibuat berupa mini database service dengan struktur:
+```c
+database/
+```
+dan file CSV sebagai tabel database yang berjalan melalui TCP Connection pada port:
+
+# 9000
+
+Client yang terhubung nantinya dapat menjalankan beberapa perintah database seperti:
+```c
+CREATE
+INSERT
+UPDATE
+DELETE
+SELECT
+dan LIST TABLE
+```
+Selain itu praktikan diminta membuat filesystem FUSE yang akan menghubungkan:
+
+folder asli terenkripsi:
+```c
+encrypted_storage
+```
+dengan mount point:
+```c
+fuse_mount
+```
+Filesystem tersebut tidak hanya melakukan passthrough biasa, tetapi juga melakukan proses enkripsi dan dekripsi otomatis terhadap file.
+
+Langkah Pengerjaan
+1. Membuat Struktur Folder
+
+Langkah pertama yaitu membuat struktur direktori yang diperlukan.
+
+Folder yang digunakan:
+```c
+encrypted_storage/
+fuse_mount/
+database/
+```
+serta file source:
+```c
+fuse.c dan client.c
+```
+Fungsi masing-masing:
+
+encrypted_storage → menyimpan file terenkripsi
+fuse_mount → mount point filesystem
+database → penyimpanan database service
+fuse.c → program filesystem
+client.c → program client TCP
+
+2. Membuat Program FUSE
+
+Program fuse.c dibuat menggunakan library FUSE untuk menghubungkan direktori terenkripsi dengan mount point.
+
+Filesystem harus mendukung operasi:
+```c
+getattr
+readdir
+mkdir
+rmdir
+create
+open
+read
+write
+truncate
+unlink
+access
+utimens
+```
+Filesystem bekerja seperti filesystem Linux biasa sehingga user dapat:
+
+membuat folder,
+membaca file,
+menghapus file,
+melihat metadata,
+serta mengedit file langsung melalui mount point.
+Penjelasan Program
+Menggunakan FUSE
+#define FUSE_USE_VERSION 31
+
+Bagian ini digunakan untuk menentukan versi FUSE yang dipakai program.
+```c
+Library yang Digunakan
+#include <fuse3/fuse.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
+```
+Library tersebut digunakan untuk:
+
+operasi filesystem,
+membaca file,
+membaca direktori,
+menangani error Linux,
+serta operasi sistem.
+Folder Encrypted Storage
+
+Filesystem menggunakan direktori:
+```c
+encrypted_storage/
+```
+sebagai tempat penyimpanan file asli yang telah terenkripsi.
+Seluruh perubahan file:
+create,
+write,
+delete,
+rename,
+
+akan langsung tersimpan pada direktori ini.
+```c
+Mount Point Fuse
+```
+Mount point:
+```c
+fuse_mount/
+```
+digunakan user untuk mengakses filesystem secara normal.
+
+User dapat menjalankan:
+```c
+ls
+cat
+mkdir
+rm
+touch
+```
+langsung dari mount point.
+
+Konsep Enkripsi dan Dekripsi
+Filesystem pada soal ini bukan pure passthrough.
+
+Filesystem bertindak sebagai translator:
+
+file asli di encrypted_storage disimpan dalam keadaan terenkripsi,
+sedangkan user melihat isi file yang sudah didekripsi melalui fuse_mount.
+Proses Saat File Dibuat
+
+Ketika user membuat file pada:
+```c
+fuse_mount/
+```
+maka filesystem akan:
+menerima isi file,
+mengenkripsi isi file,
+menyimpan hasil terenkripsi pada:
+encrypted_storage/
+
+dengan format:
+```c
+.enc
+Proses Saat File Dibaca
+```
+Saat user membuka file melalui mount point:
+
+filesystem membaca file terenkripsi,
+melakukan dekripsi,
+lalu menampilkan isi asli ke user.
+
+Dengan demikian user tetap dapat membaca file secara normal walaupun file asli terenkripsi.
+
+Operasi getattr
+```c
+static int x_getattr(...)
+```
+Digunakan untuk mengambil atribut file seperti:
+ukuran file,
+permission,
+metadata,
+tipe file.
+
+Fungsi ini dipanggil saat Linux melakukan pengecekan file.
+
+Operasi readdir
+```c
+static int x_readdir(...)
+```
+Digunakan untuk membaca isi direktori.
+
+Saat user menjalankan:
+```c
+ls fuse_mount
+```
+filesystem akan menampilkan isi direktori hasil translasi dari:
+encrypted_storage
+Operasi mkdir dan rmdir
+mkdir
+rmdir
+
+Digunakan untuk:
+membuat folder,
+menghapus folder.
+
+Perubahan otomatis diterapkan ke direktori asli.
+
+# Operasi create
+Digunakan untuk membuat file baru melalui mount point.
+
+File yang dibuat akan langsung terenkripsi saat disimpan.
+
+# Operasi read dan write
+```c
+read → membaca file
+write → menulis file
+```
+Saat write:
+data dienkripsi sebelum disimpan.
+
+Saat read:
+data didekripsi sebelum ditampilkan.
+
+# Operasi truncate
+Digunakan untuk mengubah ukuran file.
+
+# Operasi unlink
+Digunakan untuk menghapus file.
+
+Saat file dihapus dari mount point, file terenkripsi asli juga ikut terhapus.
+
+Operasi access dan utimens
+access
+utimens
+
+Digunakan untuk:
+pengecekan akses file,
+pengaturan timestamp file.
+Menjalankan Filesystem
+
+Filesystem dijalankan menggunakan:
+```c
+./fuse encrypted_storage fuse_mount
+```
+Penjelasan:
+
+encrypted_storage → source terenkripsi
+fuse_mount → mount point
+Hasil Pengujian Fuse
+
+1. Membuat File
+
+Command:
+```c
+echo "halo" > fuse_mount/a.txt
+```
+Filesystem berhasil:
+membuat file,
+mengenkripsi isi file,
+menyimpan file .enc pada encrypted_storage.
+
+2. Membaca File
+
+Command:
+```c
+cat fuse_mount/a.txt
+```
+Output:
+isi file tampil normal.
+Hal ini menunjukkan proses dekripsi berhasil.
+
+3. Mengecek File Asli
+
+Saat melihat isi:
+```c
+encrypted_storage/
+```
+isi file terlihat terenkripsi dan memiliki format:
+```c
+.enc
+```
+4. Testing notes.csv.env
+
+Praktikan diminta membuat folder:
+```c
+tests/
+```
+pada:
+encrypted_storage
+
+Kemudian file:
+```c
+notes.csv.env
+```
+dimasukkan ke folder tersebut.
+Saat filesystem aktif, isi file harus dapat dibaca dari:
+```c
+fuse_mount/tests/
+```
+Hal ini menunjukkan proses translasi dan dekripsi berhasil.
+```c
+Containerization
+```
+Setelah filesystem berhasil dibuat, tahap berikutnya yaitu menjalankan mini database service menggunakan Docker.
+
+Base image yang digunakan:
+```c
+ubuntu:latest
+```
+Program database disalin ke:
+```c
+/app
+
+Kemudian port:
+
+9000
+```
+diexpose agar dapat diakses client.
+
+Build Docker Image
+Image dibuild menggunakan:
+```c
+docker build -t soal-2-modul-4-sisop .
+```
+Penjelasan:
+
+docker build → membuat image
+-t → memberi nama image
+Menjalankan Container
+
+Container dijalankan menggunakan:
+docker run
+Container berjalan pada background dan menggunakan bind mount menuju:
+```c
+fuse_mount
+Integration Client
+```
+Setelah container aktif, dibuat program:
+```c
+client.c
+```
+untuk melakukan komunikasi TCP dengan server database.
+
+Client dapat:
+membuat database,
+membuat tabel,
+melakukan insert,
+melihat isi tabel,
+serta menjalankan command database lainnya.
+Pengujian Client
+
+Saat client dijalankan:
+koneksi TCP berhasil,
+command database berhasil dikirim,
+hasil query berhasil diterima.
+
+# Kesimpulan
+
+Pada soal kedua ini berhasil dibuat filesystem virtual menggunakan FUSE yang berfungsi sebagai translator antara:
+
+direktori terenkripsi,
+dan mount point normal.
+
+Filesystem berhasil:
+
+membaca direktori,
+membuat file,
+membaca file,
+mengenkripsi file,
+mendekripsi file,
+serta menyinkronkan seluruh perubahan dengan direktori asli.
+
