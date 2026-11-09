@@ -1,684 +1,146 @@
-## SISOP MODUL 4
-SOAL 1 — KENZ RESCUE
-Deskripsi Soal
+<div align="center">
 
-Pada soal pertama modul 4 ini, praktikan diminta membuat sebuah filesystem virtual menggunakan FUSE dengan nama kenz_rescue. Filesystem tersebut berfungsi sebagai perantara antara folder asli amba_files dengan folder mount mnt. Seluruh isi file pada folder sumber harus dapat diakses melalui mount point tanpa mengubah isi file aslinya.
-Selain melakukan mirror terhadap file asli, filesystem juga diminta menambahkan sebuah file virtual bernama tujuan.txt. File tersebut tidak boleh benar-benar ada pada folder amba_files, tetapi harus muncul ketika filesystem dijalankan melalui mount point.
+# Filesystem dan Docker
 
-Isi dari tujuan.txt diperoleh dengan cara membaca seluruh file 1.txt sampai 7.txt, kemudian mengambil bagian teks yang diawali dengan prefix:
-```c
-KOORD:
-```
-Seluruh fragmen koordinat tersebut kemudian digabung sesuai urutan file sehingga menghasilkan lokasi tujuan Mas Amba.
+</div>
 
-Filesystem yang dibuat harus dapat:
+**Filesystem in Userspace (FUSE)** memungkinkan pembuatan *virtual filesystem* di ruang pengguna tanpa memodifikasi *kernel*, sedangkan **Docker** menyediakan isolasi aplikasi melalui *containerization*.
 
-membaca isi direktori,
-membuka file,
-membaca isi file,
-membuat file virtual,
-serta menampilkan isi file melalui mount point.
-Langkah Pengerjaan
-1. Membuat Struktur Folder
+> 📖 **Akses Materi Lengkap:** [Buka MATERI.md (Filesystem dan Docker)](./MATERI.md)  
+> 👤 **Praktikan:** Raffa Al Azmi (`5027251079`) — [Repositori Asal: `SISOP-4-2026-IT-079`](https://github.com/raffaalazmi-png/SISOP-4-2026-IT-079)
 
-Tahap pertama yaitu menyiapkan struktur direktori yang diperlukan.
+---
 
-Folder yang digunakan:
-```c
-amba_files/
-mnt/
-```
-Selain itu dibuat juga file source program:
-```c
-kenz_rescue.c
-```
-Fungsi masing-masing:
+# Table of Contents
 
-amba_files → folder sumber file asli
-mnt → mount point filesystem
-kenz_rescue.c → source code FUSE
+- [Filesystem dan Docker](#filesystem-dan-docker)
+- [Table of Contents](#table-of-contents)
+- [1. Materi Referensi Modul 4](#1-materi-referensi-modul-4)
+- [2. Laporan Praktikum — Soal 1 (Kenz Rescue FUSE Filesystem)](#2-laporan-praktikum--soal-1-kenz-rescue-fuse-filesystem)
+  - [2.1 Deskripsi Soal](#21-deskripsi-soal)
+  - [2.2 Langkah Pengerjaan & Arsitektur FUSE](#22-langkah-pengerjaan--arsitektur-fuse)
+  - [2.3 Kompilasi, Eksekusi, dan Hasil Pengujian](#23-kompilasi-eksekusi-dan-hasil-pengujian)
+- [3. Laporan Praktikum — Soal 2 (Mini Database Service & Encrypted FUSE)](#3-laporan-praktikum--soal-2-mini-database-service--encrypted-fuse)
+  - [3.1 Deskripsi Soal](#31-deskripsi-soal)
+  - [3.2 Implementasi Encrypted FUSE (`fuse.c`)](#32-implementasi-encrypted-fuse-fusec)
+  - [3.3 Pengujian Filesystem FUSE](#33-pengujian-filesystem-fuse)
+  - [3.4 Containerization dengan Docker & TCP Client (`client.c`)](#34-containerization-dengan-docker--tcp-client-clientc)
+  - [3.5 Kesimpulan](#35-kesimpulan)
 
-2. Menyiapkan File Sumber
+---
 
-Selanjutnya file:
-1.txt
-2.txt
-3.txt
-4.txt
-5.txt
-6.txt
-7.txt
+## 1. Materi Referensi Modul 4
 
-dimasukkan ke dalam folder:
-```c
-amba_files/
-```
-File-file tersebut berisi catatan ekspedisi Mas Amba dan masing-masing memiliki fragmen koordinat.
+Materi lengkap mengenai **Linux Filesystem**, **FUSE (Filesystem in Userspace)**, dan **Docker Containerization** beserta gambar ilustrasi tersedia di dalam folder ini:
 
-3. Mengekstrak Arsip ZIP
+- 📄 **[Baca Materi Lengkap Modul 4 (`MATERI.md`)](./MATERI.md)**
 
-Arsip zip diekstrak menggunakan command:
-```c
-unzip amba_files.zip
-```
-Setelah proses ekstraksi selesai, file zip dihapus sesuai ketentuan soal menggunakan:
-```c
-rm -rf amba_files.zip
-```
-Hal ini dilakukan agar working directory hanya menyisakan folder hasil ekstraksi.
+---
 
-4. Membuat Program FUSE
+## 2. Laporan Praktikum — Soal 1 (Kenz Rescue FUSE Filesystem)
 
-Program kenz_rescue.c dibuat menggunakan library FUSE. Program bertugas:
+📁 **Lokasi Kode:** [`./soal1/kenz_rescue.c`](./soal1/kenz_rescue.c)
 
-membaca file dari source directory,
-menampilkan isi file pada mount point,
-membuat file virtual,
-serta menggabungkan koordinat dari seluruh file.
+### 2.1 Deskripsi Soal
 
-Filesystem bekerja menggunakan beberapa callback utama seperti:
+Membuat sebuah *filesystem virtual* menggunakan FUSE bernama `kenz_rescue` yang berfungsi sebagai perantara (*mirror/passthrough*) antara folder asli `amba_files` dengan *mount point* `mnt`, sekaligus menyisipkan sebuah **file virtual** bernama `tujuan.txt` yang hanya muncul di *mount point* (`mnt/tujuan.txt`) tanpa pernah ada secara fisik di `amba_files/`.
 
-getattr
-readdir
-open
-read
-Penjelasan Program
-Menggunakan Versi FUSE
-```c
-#define FUSE_USE_VERSION 31
-```
-Bagian ini digunakan untuk menentukan versi FUSE yang dipakai pada program.
+Isi dari `tujuan.txt` dibentuk secara dinamis dengan membaca file `1.txt` sampai `7.txt`, lalu menggabungkan seluruh fragmen teks yang diawali dengan prefix `KOORD:` sesuai urutan file.
 
-Library yang Digunakan
-```c
-#include <fuse3/fuse.h>
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <dirent.h>
-#include <sys/stat.h>
-```
-Library tersebut digunakan untuk:
+### 2.2 Langkah Pengerjaan & Arsitektur FUSE
 
-operasi filesystem,
-membaca file,
-membaca direktori,
-menangani error,
-serta operasi sistem Linux.
-Variabel Global
-static char source_dir[1024];
+1. **Menyiapkan Struktur Direktori & Ekstraksi Sumber:**
+   ```bash
+   unzip amba_files.zip
+   rm -rf amba_files.zip
+   mkdir mnt
+   ```
+2. **Header & Konfigurasi FUSE (`kenz_rescue.c`):**
+   ```c
+   #define FUSE_USE_VERSION 31
+   #include <fuse3/fuse.h>
+   #include <stdio.h>
+   #include <string.h>
+   #include <errno.h>
+   #include <fcntl.h>
+   #include <unistd.h>
+   #include <stdlib.h>
+   #include <dirent.h>
+   #include <sys/stat.h>
+   ```
+3. **Callback Utama FUSE yang Diimplementasikan:**
+   - `fullpath(char fpath[1024], const char *path)` → Menggabungkan path `source_dir` (`amba_files`) dengan path relatif dari `mnt`.
+   - `x_getattr` → Mengambil metadata/atribut file (dan memberikan atribut *regular file* virtual untuk `/tujuan.txt`).
+   - `x_readdir` → Menampilkan seluruh isi `amba_files` ditambah entri virtual `tujuan.txt`.
+   - `x_open` & `x_read` → Meneruskan pembacaan file asli `1.txt`–`7.txt`, atau menyusun gabungan baris `KOORD:` secara dinamis ketika file yang dibaca adalah `/tujuan.txt`.
 
-Variabel ini digunakan untuk menyimpan lokasi folder sumber yaitu amba_files.
+### 2.3 Kompilasi, Eksekusi, dan Hasil Pengujian
 
-Fungsi Full Path
-```c
-static void fullpath(char fpath[1024], const char *path)
-```
-Fungsi ini bertugas menggabungkan:
-
-path folder sumber,
-dengan path file dari mount point.
-
-Contoh:
-```c
-mnt/1.txt
-akan diarahkan menuju:
-amba_files/1.txt
-Fungsi getattr
-static int x_getattr(...)
-```
-Fungsi ini digunakan untuk mengambil atribut file seperti:
-
-ukuran file,
-permission,
-tipe file,
-metadata file.
-
-Fungsi ini penting karena Linux selalu memeriksa atribut file sebelum file dibuka.
-
-# Fungsi readdir
-```c
-static int x_readdir(...)
-```
-Digunakan untuk membaca isi direktori.
-
-Saat user menjalankan:
-```c
-ls mnt
-```
-fungsi ini akan:
-
-membaca isi folder asli,
-lalu menampilkan seluruh file pada mount point.
-
-Selain file asli, fungsi ini juga menampilkan:
-```c
-tujuan.txt
-```
-sebagai file virtual.
-
-# Fungsi open
-```c
-static int x_open(...)
-```
-Digunakan untuk membuka file yang diakses user.
-
-Contohnya saat user menjalankan:
-```c
-cat mnt/1.txt
-```
-filesystem akan membuka file asli dari source directory.
-
-# Fungsi read
-```c
-static int x_read(...)
-```
-Fungsi ini digunakan untuk membaca isi file.
-
-Isi file dari:
-1.txt
-2.txt
-hingga 7.txt
-
-ditampilkan melalui mount point tanpa mengubah isi aslinya.
-
-File Virtual tujuan.txt
-
-Filesystem juga menambahkan file virtual:
-
-tujuan.txt
-
-File ini:
-
-hanya muncul di mount point,
-tidak ada secara fisik pada amba_files.
-
-Ketika user menjalankan:
-```c
-cat mnt/tujuan.txt
-```
-program akan:
-
-membaca seluruh file,
-mengambil baris dengan prefix KOORD:,
-menggabungkan fragmen koordinat,
-menampilkan hasil akhir.
-Struktur Fuse Operations
-static struct fuse_operations x_oper
-
-Bagian ini digunakan untuk menghubungkan operasi FUSE dengan fungsi yang telah dibuat.
-
-Contohnya:
-
-getattr → fungsi mengambil atribut file
-readdir → fungsi membaca direktori
-open → fungsi membuka file
-read → fungsi membaca isi file
-Fungsi Main
-int main(int argc, char *argv[])
-
-Merupakan fungsi utama program.
-
-Fungsi ini bertugas:
-
-menerima argumen program,
-membaca source directory,
-menentukan mount point,
-menjalankan filesystem FUSE.
-Compile Program
-
-Program di-compile menggunakan command:
-```c
+```bash
+# Compile
 gcc kenz_rescue.c `pkg-config fuse3 --cflags --libs` -o kenz_rescue
-```
-Penjelasan:
 
-gcc → compiler bahasa C
-pkg-config → mengambil konfigurasi library FUSE
--o → menentukan nama output program
-Menjalankan Filesystem
-
-Filesystem dijalankan menggunakan:
-```c
+# Mount filesystem
 ./kenz_rescue amba_files mnt
 ```
-Penjelasan:
 
-amba_files → source directory
-mnt → mount point
-Hasil Pengujian
-1. Mengecek Isi Mount Point
+1. **Mengecek Isi Mount Point (`ls mnt`):**
+   ```text
+   1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt  tujuan.txt
+   ```
+2. **Memastikan `tujuan.txt` Tidak Ada di Folder Asli (`ls amba_files`):**
+   ```text
+   1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt
+   ```
+3. **Membaca Koordinat Gabungan (`cat mnt/tujuan.txt`):**  
+   Menampilkan hasil gabungan fragmen koordinat dari `1.txt` hingga `7.txt` secara dinamis.
 
-Command:
-```c
-ls mnt
+---
+
+## 3. Laporan Praktikum — Soal 2 (Mini Database Service & Encrypted FUSE)
+
+📁 **Lokasi Kode:** [`./fuse.c`](./fuse.c), [`./client.c`](./client.c), [`./encrypted_storage/`](./encrypted_storage/), [`./fuse_mount/`](./fuse_mount/)
+
+### 3.1 Deskripsi Soal
+
+Membuat *virtual filesystem* berbasis FUSE (`fuse.c`) yang bertindak sebagai *translator* enkripsi/dekripsi otomatis antara direktori penyimpanan terenkripsi (`encrypted_storage/`) dan *mount point* (`fuse_mount/`), yang kemudian diintegrasikan dengan **Mini Database Service** berbasis CSV di dalam **Docker Container** pada TCP port **`9000`** (`CREATE`, `INSERT`, `UPDATE`, `DELETE`, `SELECT`, `LIST TABLE`).
+
+### 3.2 Implementasi Encrypted FUSE (`fuse.c`)
+
+Filesystem mengimplementasikan operasi lengkap:
+```text
+getattr, readdir, mkdir, rmdir, create, open, read, write, truncate, unlink, access, utimens
 ```
-Output:
-```c
-1.txt
-2.txt
-3.txt
-4.txt
-5.txt
-6.txt
-7.txt
-tujuan.txt
-```
-Hal ini menunjukkan filesystem berhasil melakukan mirror file serta menambahkan file virtual.
 
-2. Mengecek Isi File
+- **Saat File Dibuat / Ditulis (`write`):** Data yang ditulis ke `fuse_mount/` otomatis dienkripsi dan disimpan ke `encrypted_storage/` dengan ekstensi `.enc`.
+- **Saat File Dibaca (`read`):** File `.enc` di `encrypted_storage/` didekripsi secara *on-the-fly* sehingga pengguna maupun container database dapat membacanya secara normal melalui `fuse_mount/`.
 
-Command:
-```c
-cat mnt/1.txt
-```
-menghasilkan isi yang sama persis dengan:
-```c
-cat amba_files/1.txt
-```
-Artinya proses passthrough berhasil dilakukan.
+### 3.3 Pengujian Filesystem FUSE
 
-3. Mengecek tujuan.txt
-
-Command:
-```c
-cat mnt/tujuan.txt
-```
-Output menampilkan hasil gabungan koordinat dari seluruh file.
-
-Hal ini menunjukkan bahwa filesystem berhasil membuat isi file secara dinamis.
-
-4. Memastikan tujuan.txt Tidak Ada di Folder Asli
-
-Command:
-```c
-ls amba_files
-```
-Output hanya berisi:
-
-1.txt
-2.txt
-3.txt
-4.txt
-5.txt
-6.txt
-7.txt
-
-Tidak terdapat:
-```c
-tujuan.txt
-```
-Hal ini membuktikan bahwa file tersebut merupakan virtual file.
-
-# SOAL 2 — MINI DATABASE SERVICE
-Deskripsi Soal
-praktikan diminta membuat sebuah filesystem virtual menggunakan FUSE yang berfungsi sebagai translator antara direktori terenkripsi dengan mount point yang dapat diakses user secara normal.
-
-Project yang dibuat berupa mini database service dengan struktur:
-```c
-database/
-```
-dan file CSV sebagai tabel database yang berjalan melalui TCP Connection pada port:
-
-# 9000
-
-Client yang terhubung nantinya dapat menjalankan beberapa perintah database seperti:
-```c
-CREATE
-INSERT
-UPDATE
-DELETE
-SELECT
-dan LIST TABLE
-```
-Selain itu praktikan diminta membuat filesystem FUSE yang akan menghubungkan:
-
-folder asli terenkripsi:
-```c
-encrypted_storage
-```
-dengan mount point:
-```c
-fuse_mount
-```
-Filesystem tersebut tidak hanya melakukan passthrough biasa, tetapi juga melakukan proses enkripsi dan dekripsi otomatis terhadap file.
-
-Langkah Pengerjaan
-1. Membuat Struktur Folder
-
-Langkah pertama yaitu membuat struktur direktori yang diperlukan.
-
-Folder yang digunakan:
-```c
-encrypted_storage/
-fuse_mount/
-database/
-```
-serta file source:
-```c
-fuse.c dan client.c
-```
-Fungsi masing-masing:
-
-encrypted_storage → menyimpan file terenkripsi
-fuse_mount → mount point filesystem
-database → penyimpanan database service
-fuse.c → program filesystem
-client.c → program client TCP
-
-2. Membuat Program FUSE
-
-Program fuse.c dibuat menggunakan library FUSE untuk menghubungkan direktori terenkripsi dengan mount point.
-
-Filesystem harus mendukung operasi:
-```c
-getattr
-readdir
-mkdir
-rmdir
-create
-open
-read
-write
-truncate
-unlink
-access
-utimens
-```
-Filesystem bekerja seperti filesystem Linux biasa sehingga user dapat:
-
-membuat folder,
-membaca file,
-menghapus file,
-melihat metadata,
-serta mengedit file langsung melalui mount point.
-Penjelasan Program
-Menggunakan FUSE
-#define FUSE_USE_VERSION 31
-
-Bagian ini digunakan untuk menentukan versi FUSE yang dipakai program.
-```c
-Library yang Digunakan
-#include <fuse3/fuse.h>
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <sys/stat.h>
-```
-Library tersebut digunakan untuk:
-
-operasi filesystem,
-membaca file,
-membaca direktori,
-menangani error Linux,
-serta operasi sistem.
-Folder Encrypted Storage
-
-Filesystem menggunakan direktori:
-```c
-encrypted_storage/
-```
-sebagai tempat penyimpanan file asli yang telah terenkripsi.
-Seluruh perubahan file:
-create,
-write,
-delete,
-rename,
-
-akan langsung tersimpan pada direktori ini.
-```c
-Mount Point Fuse
-```
-Mount point:
-```c
-fuse_mount/
-```
-digunakan user untuk mengakses filesystem secara normal.
-
-User dapat menjalankan:
-```c
-ls
-cat
-mkdir
-rm
-touch
-```
-langsung dari mount point.
-
-Konsep Enkripsi dan Dekripsi
-Filesystem pada soal ini bukan pure passthrough.
-
-Filesystem bertindak sebagai translator:
-
-file asli di encrypted_storage disimpan dalam keadaan terenkripsi,
-sedangkan user melihat isi file yang sudah didekripsi melalui fuse_mount.
-Proses Saat File Dibuat
-
-Ketika user membuat file pada:
-```c
-fuse_mount/
-```
-maka filesystem akan:
-menerima isi file,
-mengenkripsi isi file,
-menyimpan hasil terenkripsi pada:
-encrypted_storage/
-
-dengan format:
-```c
-.enc
-Proses Saat File Dibaca
-```
-Saat user membuka file melalui mount point:
-
-filesystem membaca file terenkripsi,
-melakukan dekripsi,
-lalu menampilkan isi asli ke user.
-
-Dengan demikian user tetap dapat membaca file secara normal walaupun file asli terenkripsi.
-
-Operasi getattr
-```c
-static int x_getattr(...)
-```
-Digunakan untuk mengambil atribut file seperti:
-ukuran file,
-permission,
-metadata,
-tipe file.
-
-Fungsi ini dipanggil saat Linux melakukan pengecekan file.
-
-Operasi readdir
-```c
-static int x_readdir(...)
-```
-Digunakan untuk membaca isi direktori.
-
-Saat user menjalankan:
-```c
-ls fuse_mount
-```
-filesystem akan menampilkan isi direktori hasil translasi dari:
-encrypted_storage
-Operasi mkdir dan rmdir
-mkdir
-rmdir
-
-Digunakan untuk:
-membuat folder,
-menghapus folder.
-
-Perubahan otomatis diterapkan ke direktori asli.
-
-# Operasi create
-Digunakan untuk membuat file baru melalui mount point.
-
-File yang dibuat akan langsung terenkripsi saat disimpan.
-
-# Operasi read dan write
-```c
-read → membaca file
-write → menulis file
-```
-Saat write:
-data dienkripsi sebelum disimpan.
-
-Saat read:
-data didekripsi sebelum ditampilkan.
-
-# Operasi truncate
-Digunakan untuk mengubah ukuran file.
-
-# Operasi unlink
-Digunakan untuk menghapus file.
-
-Saat file dihapus dari mount point, file terenkripsi asli juga ikut terhapus.
-
-Operasi access dan utimens
-access
-utimens
-
-Digunakan untuk:
-pengecekan akses file,
-pengaturan timestamp file.
-Menjalankan Filesystem
-
-Filesystem dijalankan menggunakan:
-```c
+```bash
+# Menjalankan FUSE
 ./fuse encrypted_storage fuse_mount
-```
-Penjelasan:
 
-encrypted_storage → source terenkripsi
-fuse_mount → mount point
-Hasil Pengujian Fuse
-
-1. Membuat File
-
-Command:
-```c
+# Uji tulis dan baca
 echo "halo" > fuse_mount/a.txt
-```
-Filesystem berhasil:
-membuat file,
-mengenkripsi isi file,
-menyimpan file .enc pada encrypted_storage.
-
-2. Membaca File
-
-Command:
-```c
 cat fuse_mount/a.txt
 ```
-Output:
-isi file tampil normal.
-Hal ini menunjukkan proses dekripsi berhasil.
 
-3. Mengecek File Asli
+- Di `fuse_mount/a.txt`, isi file terbaca normal (`halo`).
+- Di `encrypted_storage/`, file tersimpan dalam keadaan terenkripsi dengan ekstensi `.enc`.
+- File pengujian `encrypted_storage/tests/notes.csv.env` juga berhasil ditranslasi dan dibaca melalui `fuse_mount/tests/`.
 
-Saat melihat isi:
-```c
-encrypted_storage/
-```
-isi file terlihat terenkripsi dan memiliki format:
-```c
-.enc
-```
-4. Testing notes.csv.env
+### 3.4 Containerization dengan Docker & TCP Client (`client.c`)
 
-Praktikan diminta membuat folder:
-```c
-tests/
-```
-pada:
-encrypted_storage
+1. **Build Docker Image (`ubuntu:latest`, expose port `9000`, working dir `/app`):**
+   ```bash
+   docker build -t soal-2-modul-4-sisop .
+   ```
+2. **Menjalankan Container dengan Bind Mount ke `fuse_mount`:**
+   Container dijalankan di *background* dengan *bind mount* mengarah ke `fuse_mount` sehingga seluruh tabel CSV yang dibuat oleh database server otomatis terenkripsi di `encrypted_storage`.
+3. **Komunikasi Client TCP (`client.c`):**
+   Program `client.c` terhubung ke port `9000` untuk mengirimkan perintah database (`CREATE`, `INSERT`, `SELECT`, dll.) dan menampilkan respons query dari server.
 
-Kemudian file:
-```c
-notes.csv.env
-```
-dimasukkan ke folder tersebut.
-Saat filesystem aktif, isi file harus dapat dibaca dari:
-```c
-fuse_mount/tests/
-```
-Hal ini menunjukkan proses translasi dan dekripsi berhasil.
-```c
-Containerization
-```
-Setelah filesystem berhasil dibuat, tahap berikutnya yaitu menjalankan mini database service menggunakan Docker.
+### 3.5 Kesimpulan
 
-Base image yang digunakan:
-```c
-ubuntu:latest
-```
-Program database disalin ke:
-```c
-/app
-
-Kemudian port:
-
-9000
-```
-diexpose agar dapat diakses client.
-
-Build Docker Image
-Image dibuild menggunakan:
-```c
-docker build -t soal-2-modul-4-sisop .
-```
-Penjelasan:
-
-docker build → membuat image
--t → memberi nama image
-Menjalankan Container
-
-Container dijalankan menggunakan:
-docker run
-Container berjalan pada background dan menggunakan bind mount menuju:
-```c
-fuse_mount
-Integration Client
-```
-Setelah container aktif, dibuat program:
-```c
-client.c
-```
-untuk melakukan komunikasi TCP dengan server database.
-
-Client dapat:
-membuat database,
-membuat tabel,
-melakukan insert,
-melihat isi tabel,
-serta menjalankan command database lainnya.
-Pengujian Client
-
-Saat client dijalankan:
-koneksi TCP berhasil,
-command database berhasil dikirim,
-hasil query berhasil diterima.
-
-# Kesimpulan
-
-Pada soal kedua ini berhasil dibuat filesystem virtual menggunakan FUSE yang berfungsi sebagai translator antara:
-
-direktori terenkripsi,
-dan mount point normal.
-
-Filesystem berhasil:
-
-membaca direktori,
-membuat file,
-membaca file,
-mengenkripsi file,
-mendekripsi file,
-serta menyinkronkan seluruh perubahan dengan direktori asli.
-
+Pada Modul 4 ini berhasil diimplementasikan *virtual filesystem* FUSE baik untuk penyisipan file virtual dinamis (`kenz_rescue`) maupun enkripsi/dekripsi transparan (`fuse.c`) yang terintegrasi dengan layanan database ter-containerisasi menggunakan Docker.

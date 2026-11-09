@@ -1,221 +1,123 @@
-# LAPORAN PRAKTIKUM SISTEM OPERASI – SOAL 1
+<div align="center">
 
-Implementasi Client-Server (wired.c dan navi.c)
+# Thread, IPC, dan RPC
 
-1. Tujuan
+</div>
 
-Membuat sistem komunikasi client-server menggunakan:
+**Thread**, **Inter-Process Communication (IPC)**, dan **Remote Procedure Call (RPC)** memungkinkan eksekusi konkuren serta pertukaran data antar-proses maupun antar-layanan jaringan secara efisien.
 
-Socket (sebagai IPC)
-Mekanisme penanganan banyak client (menggunakan select)
-Fitur admin (RPC sederhana)
-Logging aktivitas
-2. Gambaran Sistem
+> 📖 **Akses Materi Lengkap:** [Buka MATERI.md (Thread, IPC, dan RPC)](./MATERI.md)  
+> 👤 **Praktikan:** Raffa Al Azmi (`5027251079`) — [Repositori Asal: `SISOP-3-2026-IT-079`](https://github.com/raffaalazmi-png/SISOP-3-2026-IT-079)
+
+---
+
+# Table of Contents
+
+- [Thread, IPC, dan RPC](#thread-ipc-dan-rpc)
+- [Table of Contents](#table-of-contents)
+- [1. Materi Referensi Modul 3](#1-materi-referensi-modul-3)
+- [2. Laporan Praktikum — Soal 1 (Client-Server `wired.c` & `navi.c`)](#2-laporan-praktikum--soal-1-client-server-wiredc--navic)
+  - [2.1 Tujuan & Gambaran Sistem](#21-tujuan--gambaran-sistem)
+  - [2.2 Penjelasan Berdasarkan Poin Soal](#22-penjelasan-berdasarkan-poin-soal)
+  - [2.3 Edge Case dan Penanganannya](#23-edge-case-dan-penanganannya)
+  - [2.4 Penjelasan Struktur & Komponen Kode](#24-penjelasan-struktur--komponen-kode)
+  - [2.5 Kode Utama (`wired.c`)](#25-kode-utama-wiredc)
+- [3. Laporan Praktikum — Soal 2 (Sistem Arena Client-Server Game)](#3-laporan-praktikum--soal-2-sistem-arena-client-server-game)
+  - [3.1 Struktur Program & Cara Menjalankan](#31-struktur-program--cara-menjalankan)
+  - [3.2 Register dan Login System (Shared Memory)](#32-register-dan-login-system-shared-memory)
+  - [3.3 Matchmaking System (Message Queue)](#33-matchmaking-system-message-queue)
+  - [3.4 Battle System Realtime (Multithreading)](#34-battle-system-realtime-multithreading)
+  - [3.5 Armory System](#35-armory-system)
+
+---
+
+## 1. Materi Referensi Modul 3
+
+Materi lengkap mengenai **Thread (POSIX Threads)**, **IPC (Pipes, Message Queues, Shared Memory, Sockets)**, dan **RPC** beserta diagram ilustrasi tersedia di dalam folder ini:
+
+- 📄 **[Baca Materi Lengkap Modul 3 (`MATERI.md`)](./MATERI.md)**
+
+---
+
+## 2. Laporan Praktikum — Soal 1 (Client-Server `wired.c` & `navi.c`)
+
+📁 **Lokasi Kode:** [`./soal1/`](./soal1/) (`wired.c`, `navi.c`, `protocol.h`, `history.log`)
+
+### 2.1 Tujuan & Gambaran Sistem
+
+Membuat sistem komunikasi *client-server* menggunakan:
+- **Socket** sebagai mekanisme IPC
+- **Multiplexing I/O (`select`)** untuk menangani banyak *client* sekaligus
+- **Fitur Admin** dengan mekanisme RPC sederhana
+- **Logging Aktivitas** ke dalam `history.log`
 
 Sistem terdiri dari:
+- **Server (`wired.c`)** → pusat komunikasi yang menerima pesan, mengelola *user*, dan menyebarkan pesan ke *client* lain.
+- **Client (`navi.c`)** → antarmuka pengguna untuk terhubung ke server.
 
-Server (wired.c) → pusat komunikasi
-Client (navi.c) → pengguna
+### 2.2 Penjelasan Berdasarkan Poin Soal
 
-Semua client terhubung ke server, dan server akan:
+1. **Server dapat menangani banyak client (`select()`):**  
+   Fungsi `select()` memungkinkan server memantau banyak *socket descriptor* sekaligus dan mengetahui *client* mana yang mengirim data tanpa *blocking* satu per satu.
+2. **Username harus unik:**  
+   Saat *client* masuk, server memeriksa seluruh *slot* aktif:
+   ```c
+   if (strcmp(clients[i].name, name) == 0)
+   ```
+   Jika *username* sudah ada, koneksi ditolak dan *socket* ditutup.
+3. **Broadcast pesan:**  
+   Ketika *client* mengirim pesan, server meneruskannya ke semua *client* lain kecuali pengirim:
+   ```c
+   send(clients[j].socket, msg, strlen(msg), 0);
+   ```
+4. **Autentikasi Admin (`The Knights`):**  
+   ```text
+   Username: The Knights
+   Password: 001122
+   ```
+   Jika autentikasi berhasil, *user* mendapatkan hak akses admin.
+5. **RPC (*Remote Procedure Call*) Admin:**  
+   Admin dapat memanggil fungsi di server melalui perintah:
+   - `1` → Melihat jumlah *user* aktif
+   - `2` → Melihat *uptime* server
+   - `3` → *Shutdown* server
+   - `4` → *Disconnect*
+6. **Logging (`history.log`):**  
+   Semua aktivitas dicatat ke dalam `history.log`:
+   ```c
+   FILE *f = fopen("history.log", "a");
+   fprintf(f, "[%s] %s\n", type, msg);
+   ```
 
-menerima pesan
-mengelola user
-menyebarkan pesan ke client lain
-3. Penjelasan Berdasarkan Poin Soal
-3.1 Server dapat menangani banyak client
+### 2.3 Edge Case dan Penanganannya
 
-Digunakan fungsi:
+- **Username duplikat:** Ditolak saat proses *handshake* awal (`if (exists)`).
+- **Server penuh:** Jika `slot == -1` (mencapai `MAX_CLIENTS`), koneksi baru ditolak dengan pesan penuh.
+- **Client disconnect tiba-tiba:** Ketika `valread == 0`, *socket* ditutup (`close(sd)`) dan `clients[i].socket = 0` dikosongkan.
+- **Password admin salah:** Dicek dengan `strcmp(pass, ADMIN_PASS)`, akses ditolak jika tidak cocok.
+- **Buffer overflow:** Membatasi ukuran *buffer* dan menggunakan `snprintf`.
 
-select()
+### 2.4 Penjelasan Struktur & Komponen Kode
 
-Fungsi ini memungkinkan server:
-
-memantau banyak socket sekaligus
-mengetahui client mana yang mengirim data
-
-Tanpa select, server hanya bisa melayani satu client dalam satu waktu.
-
-3.2 Username harus unik
-
-Saat client masuk:
-```c
-if (strcmp(clients[i].name, name) == 0)
-```
-Server membandingkan username baru dengan semua username yang sudah ada.
-Jika sama:
-
-koneksi ditolak
-socket ditutup
-3.3 Broadcast pesan
-
-Ketika client mengirim pesan:
-```c
-send(clients[j].socket, msg, strlen(msg), 0);
-```
-Server akan:
-
-mengirim pesan ke semua client lain
-kecuali pengirim
-3.4 Admin (The Knights)
-
-Admin dikenali dengan:
-```c
-Username: The Knights
-Password: 001122
-```
-Jika login berhasil:
-
-user diberi hak admin
-dapat menjalankan perintah khusus
-3.5 RPC (Remote Procedure Call)
-
-Admin dapat mengirim perintah:
-
-1 → melihat jumlah user
-2 → melihat uptime server
-3 → shutdown server
-4 → disconnect
-
-Implementasi:
-```c
-strncmp(buffer, "1", 1)
-```
-Server membaca input dan menjalankan fungsi tertentu.
-
-3.6 Logging
-
-Semua aktivitas dicatat ke file:
-```c
-history.log
-```
-Implementasi:
-```c
-FILE *f = fopen("history.log", "a");
-fprintf(f, "[%s] %s\n", type, msg);
-```
-4. Edge Case dan Penanganannya
-4.1 Username duplikat
-
-Masalah:
-Dua client menggunakan username yang sama.
-
-Solusi:
-```c
-if (exists)
-```
-Koneksi ditolak agar tidak terjadi konflik.
-
-4.2 Server penuh
-
-Jika jumlah client mencapai batas maksimum:
-```c
-if (slot == -1)
-```
-Client baru tidak diterima.
-
-4.3 Client disconnect
-
-Jika client keluar:
-```c
-if (valread == 0)
-```
-Solusi:
-```c
-close(sd);
-clients[i].socket = 0;
-```
-Slot dikosongkan agar bisa dipakai client lain.
-
-4.4 Password admin salah
-
-Jika password tidak cocok:
-```c
-strcmp(pass, ADMIN_PASS)
-```
-Akses admin ditolak.
-
-4.5 Buffer overflow
-
-Masalah:
-Input terlalu panjang dapat merusak memori.
-
-Solusi:
-
-batasi ukuran buffer
-gunakan fungsi aman seperti snprintf
-
-# 5. Penjelasan Kode
-
- Struktur Client
 ```c
 struct Client {
     int socket;
     char name[50];
     int isAdmin;
 };
-```
-Digunakan untuk menyimpan:
 
-socket client
-username
-status admin
-
-5.2 Array Client
-```c
 struct Client clients[MAX_CLIENTS];
 ```
-Menyimpan semua client yang aktif.
 
-5.3 Socket
-```c
-socket(AF_INET, SOCK_STREAM, 0);
-```
-Membuat jalur komunikasi antara server dan client.
+- `socket(AF_INET, SOCK_STREAM, 0)` → Membuat *endpoint* komunikasi TCP.
+- `bind(server_fd, ...)` → Mengikat *socket* ke port `8080`.
+- `listen(server_fd, 5)` → Menyiapkan *socket* menerima antrean koneksi.
+- `accept(...)` → Menerima koneksi *client* baru.
+- `select(...)` → Memantau seluruh *file descriptor* aktif.
+- `read(sd, buffer, 1024)` & `send(...)` → Membaca dan mengirim pesan melalui *socket*.
 
-5.4 Bind
-```c
-bind(server_fd, ...);
-```
-Menghubungkan socket dengan port.
+### 2.5 Kode Utama (`wired.c`)
 
-5.5 Listen
-```c
-listen(server_fd, 5);
-```
-Server siap menerima koneksi.
-
-5.6 Accept
-```c
-accept(...)
-```
-Menerima koneksi client baru.
-
-5.7 Select
-select(...)
-```
-Mengawasi semua socket aktif.
-
-5.8 Read
-```c
-read(sd, buffer, 1024);
-
-Menerima pesan dari client.
-
-5.9 Send
-```c
-send(...)
-```
-
-Mengirim pesan ke client.
-
-5.10 Logging
-```c
-fprintf(...)
-```
-Menyimpan aktivitas ke file.
-
-6. Kode Utama (wired.c)
 ```c
 #include <stdio.h>
 #include <stdlib.h>
@@ -266,57 +168,33 @@ int main() {
     return 0;
 }
 ```
-7. Kesimpulan
 
-Program yang dibuat:
+---
 
-mampu menangani banyak client
-memastikan username unik
-menyediakan komunikasi antar client
-memiliki sistem admin dengan command
-mencatat aktivitas ke file log
-menangani berbagai kondisi error
+## 3. Laporan Praktikum — Soal 2 (Sistem Arena Client-Server Game)
 
-Dengan pendekatan ini, sistem menjadi stabil dan sesuai dengan kebutuhan soal.
+📁 **Lokasi Kode:** [`./soal2/`](./soal2/) (`orion.c`, `eternal.c`, `makefile`, `users.txt`)
 
-# SOAL 2 – SISTEM ARENA (CLIENT-SERVER GAME)
-mensimulasikan game implemen IPC dan thread 
+### 3.1 Struktur Program & Cara Menjalankan
 
-Struktur program:
-```c
-orion.c sebagai server
-eternal.c sebagai client
-arena.h sebagai definisi struktur data
-Makefile untuk kompilasi dan manajemen IPC
+Mensimulasikan game *arena battle* dengan implementasi **Shared Memory**, **Message Queue (IPC)**, dan **Multithreading**:
+- `orion.c` → Server game
+- `eternal.c` → Client pemain
+- `makefile` → Kompilasi dan manajemen IPC
 
-Cara compile dan Menjalankan
-```c
+```bash
+# Compile
 make
-```
-Menjalankan Server
-```c
+
+# Menjalankan Server & Client
 ./orion
 ./eternal
 ```
-1. REGISTER DAN LOGIN SYSTEM
-Tujuan
 
-Membuat sistem autentikasi pengguna yang aman dan mencegah duplikasi data serta login ganda.
+### 3.2 Register dan Login System (Shared Memory)
 
-Cara Kerja
-Register
+Membuat sistem autentikasi pengguna yang aman serta mencegah duplikasi akun dan login ganda.
 
-Pengguna memasukkan username dan password. Sistem akan:
-
-Mengecek apakah username sudah digunakan
-Jika belum, data disimpan ke shared memory
-Login
-
-Pengguna memasukkan username dan password. Sistem akan:
-
-Memverifikasi kecocokan data
-Mengecek apakah akun sedang digunakan oleh client lain
-Struktur Data
 ```c
 typedef struct {
     char username[50];
@@ -328,85 +206,34 @@ typedef struct {
     int online;
 } Player;
 ```
-Kendala
-Duplikasi username
-Login bersamaan dari dua client
 
-Solusi
-Validasi username saat register
-Menggunakan flag online untuk mencegah login ganda
-Mutex untuk sinkronisasi akses data
+- **Register:** Memvalidasi apakah *username* sudah ada; jika belum, disimpan ke *shared memory*.
+- **Login:** Memverifikasi kecocokan *password* dan memeriksa *flag* `online` serta *mutex* untuk mencegah login ganda dari dua *client*.
 
-2. MATCHMAKING SYSTEM
-Tujuan
+### 3.3 Matchmaking System (Message Queue)
 
-Menghubungkan dua pemain untuk bertarung dalam satu arena.
+Menghubungkan dua pemain untuk bertarung dalam satu arena menggunakan *Message Queue* (`MT_MATCH_REQ` dan `MT_MATCH_FOUND`):
+- *Client* mengirim *request* matchmaking ke server.
+- Server menyimpan pemain pertama dalam status *waiting*, lalu memasangkannya saat pemain kedua masuk.
+- Jika melewati batas *timeout*, pemain diarahkan melawan *bot*.
+- Menggunakan *flag* `in_match` dan penguncian *shared memory* agar sinkronisasi tetap konsisten.
 
-Cara Kerja
-Client mengirim request matchmaking ke server menggunakan message queue
-Server menyimpan player pertama sebagai waiting
-Ketika player kedua masuk, server memasangkan keduanya
-Server mengirim pesan ke kedua client bahwa match ditemukan
-Mekanisme
-```c
-Menggunakan message type MT_MATCH_REQ dan MT_MATCH_FOUND
-Server menyimpan sementara ID player yang menunggu
-Timeout
-```
-Jika tidak ditemukan lawan dalam waktu tertentu, sistem akan mengarahkan pemain untuk melawan bot.
+### 3.4 Battle System Realtime (Multithreading)
 
-Kendala
-Player bisa masuk lebih dari satu matchmaking
-Sinkronisasi antar player tidak konsisten
-Solusi
-Menggunakan flag in_match
-Mengunci shared memory saat proses matchmaking
+Pertarungan antar-pemain berjalan secara *realtime* tanpa *blocking* menggunakan dua *thread*:
+- **Thread utama:** Menangani input pemain (`a` untuk serangan biasa, `u` untuk *ultimate*).
+- **Thread kedua:** Menerima *damage* dari lawan melalui *message queue*.
 
-3. BATTLE SYSTEM (REALTIME)
-Membuat sistem pertarungan antar pemain secara realtime tanpa blocking.
+**Perhitungan Battle:**
+- `HP = 100 + (XP / 10)`
+- `Damage = 10 + (XP / 50) + Weapon`
+- `Ultimate Damage = Damage * 3`
 
-Cara Kerja
-Input
-```c
-a untuk serangan biasa
-u untuk ultimate
-Perhitungan Damage
-Damage = 10 + (XP / 50) + Weapon
+### 3.5 Armory System
 
-Ultimate:
-
-Damage = Damage × 3
-Perhitungan HP
-HP = 100 + (XP / 10)
-Realtime System
-```
-Battle dijalankan menggunakan multithreading:
-
-Thread utama menangani input user
-Thread kedua menerima damage dari lawan
-Komunikasi
-
-Damage dikirim melalui message queue dari satu client ke client lain melalui server.
-
-
-4. ARMORY SYSTEM
- fitur pembelian senjata untuk meningkatkan kekuatan pemain.
-
-Cara Kerja
-
-Player dapat membeli:
-Wood Sword dengan tambahan damage kecil
-Iron Sword dengan tambahan damage lebih besar
-Mekanisme
-Sistem mengecek jumlah gold sebelum pembelian
-Weapon akan diperbarui hanya jika lebih kuat dari sebelumnya
-Contoh
-```c
-if(me->weapon < 15) me->weapon = 15;
-Kendala
-Gold menjadi negatif
-Weapon tertimpa oleh nilai lebih kecil
-Solusi
-Validasi gold sebelum pembelian
-Bandingkan nilai weapon sebelum update
-```
+Fitur pembelian senjata (*Wood Sword* dan *Iron Sword*) menggunakan *Gold*:
+- Memvalidasi kecukupan *gold* agar tidak bernilai negatif.
+- Memastikan senjata hanya diperbarui jika nilai *damage* senjata baru lebih tinggi:
+  ```c
+  if (me->weapon < 15) me->weapon = 15;
+  ```
